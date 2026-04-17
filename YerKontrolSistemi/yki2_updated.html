@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YKİ — Yer Kontrol İstasyonu</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0a0e17;
+      color: #c5cdd8;
+      font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+      font-size: 13px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #header {
+      background: linear-gradient(90deg, #0d1420, #131b2e);
+      border-bottom: 1px solid #1e2a3a;
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    #header .left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #e63946;
+      box-shadow: 0 0 8px #e63946;
+    }
+
+    #status-dot.connected {
+      background: #00ff6a;
+      box-shadow: 0 0 8px #00ff6a;
+    }
+
+    #header .title {
+      font-weight: 700;
+      font-size: 15px;
+      letter-spacing: 2px;
+      color: #e0e6f0;
+    }
+
+    #header .right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #ws-url {
+      background: #0d1420;
+      border: 1px solid #1e2a3a;
+      color: #8892b0;
+      padding: 4px 8px;
+      border-radius: 4px;
+      width: 240px;
+      font-size: 12px;
+      font-family: inherit;
+    }
+
+    #btn-connect {
+      background: #00ff6a;
+      color: #0a0e17;
+      border: none;
+      border-radius: 4px;
+      padding: 5px 14px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 12px;
+    }
+
+    #btn-connect.connected {
+      background: #1a1a2e;
+      color: #e63946;
+    }
+
+    #main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    #panel {
+      width: 200px;
+      flex-shrink: 0;
+      background: #0d1420;
+      border-right: 1px solid #1e2a3a;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .section-label {
+      color: #4a5568;
+      font-size: 10px;
+      letter-spacing: 2px;
+      margin-bottom: 4px;
+    }
+
+    .cmd-btn {
+      background: #131b2e;
+      border: 1px solid #1e2a3a;
+      border-radius: 6px;
+      padding: 10px 0;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 13px;
+      letter-spacing: 1px;
+      transition: all 0.15s;
+      width: 100%;
+    }
+
+    .cmd-btn:hover { filter: brightness(1.15); }
+
+    .servo-label {
+      color: #64ffda;
+      font-size: 11px;
+    }
+
+    input[type=range] {
+      width: 100%;
+      accent-color: #00ff6a;
+    }
+
+    #footer-text {
+      font-size: 10px;
+      color: #2d3748;
+      text-align: center;
+      border-top: 1px solid #1e2a3a;
+      padding-top: 8px;
+      margin-top: auto;
+    }
+
+    #center {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #canvas-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #080c14;
+      padding: 8px;
+    }
+
+    #feed {
+      max-width: 100%;
+      max-height: 100%;
+      border: 2px solid #1e2a3a;
+      border-radius: 4px;
+      background: #1a1a2e;
+    }
+
+    #log-panel {
+      height: 160px;
+      flex-shrink: 0;
+      background: #0a0e17;
+      border-top: 1px solid #1e2a3a;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #log-header {
+      padding: 4px 12px;
+      color: #4a5568;
+      font-size: 10px;
+      letter-spacing: 2px;
+      border-bottom: 1px solid #1e2a3a;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    #log-header span:last-child {
+      cursor: pointer;
+    }
+
+    #log-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px 12px;
+      font-size: 11px;
+    }
+
+    .log-entry {
+      line-height: 1.7;
+    }
+
+    .log-entry .ts {
+      color: #2d3748;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="header">
+    <div class="left">
+      <div id="status-dot"></div>
+      <span class="title">YKİ — YER KONTROL İSTASYONU</span>
+    </div>
+    <div class="right">
+      <input id="ws-url" value="ws://localhost:8765" />
+      <button id="btn-connect" onclick="toggleConnect()">BAĞLAN</button>
+    </div>
+  </div>
+
+  <div id="main">
+    <div id="panel">
+      <div class="section-label">KOMUTLAR</div>
+      <button class="cmd-btn" id="btn-scan" style="color:#00ff6a;" onclick="handleScan()">◎ SCAN</button>
+      <button class="cmd-btn" id="btn-track" style="color:#e63946;" onclick="handleTrack()">◉ TRACK</button>
+      <button class="cmd-btn" id="btn-home" style="color:#ffd166;" onclick="handleHome()">⌂ HOME</button>
+
+      <div class="section-label" style="margin-top:12px;">SERVO KONTROL</div>
+
+      <div class="servo-label">PAN: <span id="pan-val">90</span>°</div>
+      <input
+        type="range"
+        id="pan-slider"
+        min="0"
+        max="180"
+        value="90"
+        oninput="setPanUI(this.value)"
+        onpointerup="sendCommand('PAN:' + this.value)"
+      />
+
+      <div class="servo-label">TILT: <span id="tilt-val">90</span>°</div>
+      <input
+        type="range"
+        id="tilt-slider"
+        min="0"
+        max="180"
+        value="90"
+        oninput="setTiltUI(this.value)"
+        onpointerup="sendCommand('TILT:' + this.value)"
+      />
+
+      <div id="footer-text">v1.0 — Hava Savunma Takip</div>
+    </div>
+
+    <div id="center">
+      <div id="canvas-wrap">
+        <canvas id="feed" width="640" height="480"></canvas>
+      </div>
+
+      <div id="log-panel">
+        <div id="log-header">
+          <span>LOG KAYITLARI</span>
+          <span onclick="clearLogs()">TEMİZLE</span>
+        </div>
+        <div id="log-content"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let ws = null;
+    let connected = false;
+    let scanning = false;
+    let locked = false;
+    let liveMode = false;
+    let panAngle = 90;
+    let tiltAngle = 90;
+
+    const canvas = document.getElementById("feed");
+    const ctx = canvas.getContext("2d");
+    const logEl = document.getElementById("log-content");
+    const frameImg = new Image();
+
+    const logColors = {
+      info: "#8892b0",
+      cmd: "#64ffda",
+      ok: "#00ff6a",
+      warn: "#ffd166",
+      err: "#e63946",
+      target_found: "#e63946",
+      target_lost: "#ffd166"
+    };
+
+    function addLog(msg, type = "info") {
+      const ts = new Date().toLocaleTimeString("tr-TR");
+      const color = logColors[type] || "#8892b0";
+      const weight = (type === "target_found" || type === "target_lost") ? "bold" : "normal";
+      logEl.innerHTML += `<div class="log-entry" style="color:${color};font-weight:${weight}"><span class="ts">[${ts}]</span> ${msg}</div>`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function clearLogs() {
+      logEl.innerHTML = "";
+    }
+
+    function setConnected(val) {
+      connected = val;
+      const dot = document.getElementById("status-dot");
+      const btn = document.getElementById("btn-connect");
+
+      dot.className = val ? "connected" : "";
+      btn.className = val ? "connected" : "";
+      btn.textContent = val ? "KES" : "BAĞLAN";
+    }
+
+    function setPanUI(value) {
+      panAngle = Number(value);
+      document.getElementById("pan-val").textContent = value;
+      document.getElementById("pan-slider").value = value;
+    }
+
+    function setTiltUI(value) {
+      tiltAngle = Number(value);
+      document.getElementById("tilt-val").textContent = value;
+      document.getElementById("tilt-slider").value = value;
+    }
+
+    function updateButtons() {
+      const scanBtn = document.getElementById("btn-scan");
+      const trackBtn = document.getElementById("btn-track");
+
+      scanBtn.style.background = scanning ? "#00ff6a" : "#131b2e";
+      scanBtn.style.color = scanning ? "#0a0e17" : "#00ff6a";
+      scanBtn.style.borderColor = scanning ? "#00ff6a" : "#1e2a3a";
+
+      trackBtn.style.background = locked ? "#e63946" : "#131b2e";
+      trackBtn.style.color = locked ? "#0a0e17" : "#e63946";
+      trackBtn.style.borderColor = locked ? "#e63946" : "#1e2a3a";
+    }
+
+    function sendCommand(cmd) {
+      if (!cmd.startsWith("PAN:") && !cmd.startsWith("TILT:")) {
+        addLog("Komut gönderildi: " + cmd, "cmd");
+      }
+
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ command: cmd }));
+      } else {
+        addLog("WebSocket açık değil", "err");
+      }
+    }
+
+    function toggleConnect() {
+      if (connected) {
+        ws?.close();
+        return;
+      }
+
+      const url = document.getElementById("ws-url").value.trim();
+
+      try {
+        ws = new WebSocket(url);
+
+        ws.onopen = () => {
+          setConnected(true);
+          addLog("RPi bağlantısı kuruldu", "ok");
+        };
+
+        ws.onclose = () => {
+          setConnected(false);
+          scanning = false;
+          locked = false;
+          liveMode = false;
+          updateButtons();
+          addLog("Bağlantı kapandı", "warn");
+          drawIdleScreen();
+        };
+
+        ws.onerror = () => {
+          addLog("Bağlantı hatası", "err");
+        };
+
+        ws.onmessage = (e) => {
+          try {
+            const data = JSON.parse(e.data);
+
+            if (data.frame) {
+              liveMode = true;
+              drawLiveFrame(data.frame);
+            }
+
+            if (data.pan !== undefined) setPanUI(data.pan);
+            if (data.tilt !== undefined) setTiltUI(data.tilt);
+
+            if (data.mode !== undefined) {
+              scanning = data.mode === "SCAN";
+            }
+
+            if (data.locked !== undefined) {
+              locked = data.locked;
+            }
+
+            if (data.log) {
+              addLog(data.log, "info");
+            }
+
+            updateButtons();
+          } catch (err) {
+            addLog("Mesaj parse hatası", "err");
+            console.error(err);
+          }
+        };
+      } catch (err) {
+        addLog("Bağlantı hatası: " + err.message, "err");
+      }
+    }
+
+    frameImg.onload = function () {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(frameImg, 0, 0, canvas.width, canvas.height);
+    };
+
+    function drawLiveFrame(base64) {
+      frameImg.src = "data:image/jpeg;base64," + base64;
+    }
+
+    function drawIdleScreen() {
+      if (liveMode) return;
+
+      const W = canvas.width;
+      const H = canvas.height;
+
+      ctx.fillStyle = "#1a1a2e";
+      ctx.fillRect(0, 0, W, H);
+
+      ctx.strokeStyle = "rgba(0,255,100,0.07)";
+      ctx.lineWidth = 1;
+
+      for (let x = 0; x < W; x += 40) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, H);
+        ctx.stroke();
+      }
+
+      for (let y = 0; y < H; y += 40) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(W, y);
+        ctx.stroke();
+      }
+
+      const cx = W / 2;
+      const cy = H / 2;
+
+      ctx.strokeStyle = "#00ff6a";
+      ctx.lineWidth = 2;
+
+      ctx.beginPath();
+      ctx.moveTo(cx, 0);
+      ctx.lineTo(cx, cy - 25);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(cx, cy + 25);
+      ctx.lineTo(cx, H);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(0, cy);
+      ctx.lineTo(cx - 25, cy);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(cx + 25, cy);
+      ctx.lineTo(W, cy);
+      ctx.stroke();
+
+      ctx.fillStyle = connected ? "#00ff6a" : "#e63946";
+      ctx.font = "bold 14px monospace";
+      ctx.fillText(
+        connected ? "CANLI GORUNTU BEKLENIYOR..." : "BAGLANTI YOK",
+        20,
+        30
+      );
+    }
+
+    function handleScan() {
+      sendCommand(scanning ? "STOP_SCAN" : "SCAN");
+    }
+
+    function handleTrack() {
+      sendCommand(locked ? "STOP_TRACK" : "TRACK");
+    }
+
+    function handleHome() {
+      sendCommand("HOME");
+    }
+
+    drawIdleScreen();
+    updateButtons();
+  </script>
+</body>
+</html>
