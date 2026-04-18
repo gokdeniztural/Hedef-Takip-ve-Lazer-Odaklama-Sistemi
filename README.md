@@ -1,4 +1,4 @@
-# 🎯 NesneTakip — Gerçek Zamanlı Nesne Takip Sistemi
+# 🎯 Hedef Takip ve Lazer Odaklama Sistemi
 
 > HSV renk tespiti, PD kontrol ve WebSocket tabanlı yer kontrol istasyonu ile donatılmış pan-tilt servo takip sistemi.
 > (Bu proje Bilgisayar Organizasyonu dersi kapsamında final projesi olarak ekip arkadaşlarım ile birlikte hazırlanmıştır!)
